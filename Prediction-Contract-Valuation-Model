@@ -1,0 +1,98 @@
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+import seaborn as sns
+import matplotlib.pyplot as plt
+from sklearn.metrics import mean_squared_error, r2_score
+from datetime import datetime
+data = pd.read_csv('Nat_Gas.csv')
+data
+
+data.describe()
+plt.figure(figsize=(9,12))
+plt.title('Natural Gas Prices Distibution')
+sns.distplot(data['Prices'], color = 'darkblue')
+plt.show()
+plt.figure(figsize = (16,9))
+plt.scatter(data['Dates'], data['Prices'], color = 'darkblue')
+plt.title('Natural Gas Price vs Date')
+plt.xlabel('Dates')
+plt.ylabel('Prices')
+plt.box(False)
+plt.show()
+# Convert 'Dates' column to datetime format
+data['Dates'] = pd.to_datetime(data['Dates'])
+
+# Convert dates to ordinal values
+data['Date_Ordinal'] = data['Dates'].apply(lambda x: x.toordinal())
+
+X = data[['Date_Ordinal']]
+y = data['Prices']
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.25, random_state = 40)
+model = LinearRegression()
+model.fit(X_train, y_train)
+
+y_pred = model.predict(X_test)
+mse = mean_squared_error(y_test, y_pred)
+r2 = r2_score(y_test, y_pred)
+
+print("Mean Squared Error:", mse)
+print("R-squared:", r2)
+plt.figure(figsize=(16,9))
+plt.scatter(X_train, y_train, color = 'lightcoral', label = 'Training Data')
+plt.scatter(X_test, y_test, color = 'lightgreen', label = 'Testing Data')
+plt.plot(X_test, y_pred, color = 'firebrick', linewidth = 2, label='Predicted Prices')
+plt.title('Natural Gas Prices vs Dates (Regression Model)')
+plt.xlabel('Dates (Datetime Format)')
+plt.ylabel('Natural Gas Prices')
+plt.legend()
+plt.box(False)
+plt.show()
+desired_date = str(input("Enter the Date for which you want to predict the price ( Format: mm/dd/yyyy ):   "))
+
+date_ordinal = datetime.strptime(desired_date, '%m/%d/%Y').toordinal()
+predicted_price = model.predict([[date_ordinal]])
+print(f"The Predicted Price for {desired_date} is ", predicted_price)
+
+
+###################################################################################################################
+##### Contract Valuation #####
+##### Assumption: The key assumption is that the purchase and selling prices are for per MMBtu. #####
+
+Injection_date = str(input("Enter the injection date (format: mm/dd/yyyy):   "))
+Withdrawal_date = str(input("Enter the withrawal date that comes after injection date (format: mm/dd/yyyy):   "))
+
+date_original_inj = datetime.strptime(desired_date, '%m/%d/%Y').toordinal()
+date_original_wit = datetime.strptime(desired_date, '%m/%d/%Y').toordinal()
+
+purchase_price = model.predict([[date_original_inj]])
+selling_price = model.predict([[date_original_wit]])
+
+Inj_rate = float(input("Enter the natural gas injection rate in MMBtu/day:   "))
+wit_rate = float(input("Enter the natural gas withdrawal rate in MMBtu/day:   "))
+
+Max_vol = float(input("Enter the maximum volume of natural gas that can be stored in MMBtu:   "))
+Fixed_Storage_Cost = float(input("Enter the storage cost:   "))
+Variable_Storage_Cost = float(input("Enter the variable storage cost in per MMBtu:   "))
+
+def contract_val(purchase_price, selling_price, Inj_rate, wit_rate, Max_vol, Fixed_Storage_Cost, Variable_Storage_Cost):
+  if (Inj_rate <= Max_vol and Inj_rate >= wit_rate):
+    buying_cost = purchase_price * Inj_rate
+    selling_cost = selling_price * wit_rate
+    # total_var_cost = Variable_Storage_Cost * Inj_rate
+    contract_valuation = selling_cost - (buying_cost + Fixed_Storage_Cost)
+    # contract_valuation = buying_cost - (selling_cost + total_var_cost)
+    return contract_valuation
+  elif (Inj_rate > Max_vol and wit_rate <= Max_vol):
+    Inj_rate = Max_vol
+    buying_cost = purchase_price * Inj_rate
+    selling_cost = selling_price * wit_rate
+    # total_var_cost = Variable_Storage_Cost * Inj_rate
+    contract_valuation = selling_cost - (buying_cost + Fixed_Storage_Cost)
+    # contract_valuation = buying_cost - (selling_cost + total_var_cost)
+    return contract_valuation
+
+Val_Contract = contract_val(purchase_price, selling_price, Inj_rate, wit_rate, Max_vol, Fixed_Storage_Cost, Variable_Storage_Cost)
+print("The value of the contract is: ", Val_Contract)
